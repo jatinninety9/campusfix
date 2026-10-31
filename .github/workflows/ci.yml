@@ -1,0 +1,73 @@
+name: CampusFix CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Tests and Docker verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      CI: "true"
+      BASE_URL: http://127.0.0.1:8095
+      BROWSER_CHANNEL: chromium
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare test configuration
+        run: cp .env.example .env
+
+      - name: Install Chromium and system dependencies
+        run: npx playwright install --with-deps chromium
+
+      - name: Build React
+        run: npm run build
+
+      - name: Build images and start containers
+        run: docker compose up -d --build --wait --wait-timeout 180
+
+      - name: Initialize temporary database and sample accounts
+        run: npm run db:init
+
+      - name: Run backend integration tests
+        run: npm test
+
+      - name: Check application health through Nginx
+        run: curl --fail --show-error http://127.0.0.1:8095/api/health
+
+      - name: Run browser workflow against containers
+        run: npm run test:browser
+
+      - name: Show diagnostics on failure
+        if: failure()
+        run: |
+          docker compose ps -a
+          docker compose logs --no-color --tail 100
+
+      - name: Remove temporary CI containers and volumes
+        if: always()
+        run: docker compose down --volumes --remove-orphans

@@ -3,10 +3,13 @@ import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { db } from "../server/src/db.js";
 await mkdir("output/previews", { recursive: true });
-const browser = await chromium.launch({
-  channel: process.env.BROWSER_CHANNEL || "msedge",
-  headless: true,
-});
+const browserOptions = { headless: true };
+
+if (process.env.BROWSER_CHANNEL !== "chromium") {
+  browserOptions.channel = process.env.BROWSER_CHANNEL || "msedge";
+}
+
+const browser = await chromium.launch(browserOptions);
 const context = await browser.newContext({
   viewport: { width: 1440, height: 1100 },
   reducedMotion: "reduce",
@@ -88,7 +91,7 @@ async function noOverflow() {
   );
 }
 try {
-  await page.goto("http://127.0.0.1:5173");
+  await page.goto(process.env.BASE_URL || "http://127.0.0.1:5173");
   await page.getByRole("heading", { name: "Good to see you again." }).waitFor();
   await page.screenshot({
     path: "output/previews/login-desktop.png",
