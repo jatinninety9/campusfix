@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.env
+*.log
+playwright-report/
+test-results/
+
+# Credentials and private configuration
+.env
+.env.*
+!.env.example
+**/.aws/
+*.pem
+*.key
+
+# Generated previews and local configuration backup
+output/
+compose.database-only.backup.yaml
