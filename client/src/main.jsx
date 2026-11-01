@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, lazy, Suspense } from "react";
+import PhotoAttachments from "./PhotoAttachments.jsx";
 import { createRoot } from "react-dom/client";
 import {
   ArrowUpRight,
@@ -35,7 +36,10 @@ async function api(path, options = {}) {
   try {
     response = await fetch(`/api${path}`, {
       ...options,
-      headers: { "Content-Type": "application/json", ...options.headers },
+      headers: {  ...(options.body instanceof FormData
+    ? {}
+    : { "Content-Type": "application/json" }),
+  ...options.headers, },
       credentials: "same-origin",
     });
   } catch {
@@ -251,99 +255,232 @@ function Auth({ onLogin }) {
   );
 }
 function IssueForm({ onCreated, onCancel }) {
-  const [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
-  async function submit(e) {
-    e.preventDefault();
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [photos, setPhotos] = useState([]);
+  const [createdIssue, setCreatedIssue] = useState(null);
+  const [uploadedCount, setUploadedCount] = useState(0);
+  const photoInput = useRef(null);
+
+  function selectPhotos(event) {
+    const selected = Array.from(event.target.files || []);
+    setError("");
+
+    if (selected.length + uploadedCount > 3) {
+      setError(`You can select up to ${3 - uploadedCount} more photos.`);
+      event.target.value = "";
+      return;
+    }
+
+    if (selected.some(file => file.size > 5 * 1024 * 1024)) {
+      setError("Each photo must be 5 MiB or smaller.");
+      event.target.value = "";
+      return;
+    }
+
+    setPhotos(selected);
+  }
+
+  async function submit(event) {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(event.currentTarget));
     setBusy(true);
     setError("");
+
     try {
-      await api("/issues", {
-        method: "POST",
-        body: JSON.stringify(Object.fromEntries(new FormData(e.currentTarget))),
-      });
+      let report = createdIssue;
+
+      if (!report) {
+        report = await api("/issues", {
+          method: "POST",
+          body: JSON.stringify(values),
+        });
+        setCreatedIssue(report);
+      }
+
+      const failed = [];
+      let firstError = "";
+
+      for (const photo of photos) {
+        const body = new FormData();
+        body.append("photo", photo);
+
+        try {
+          await api(`/issues/${report.id}/attachments`, {
+            method: "POST",
+            body,
+          });
+          setUploadedCount(count => count + 1);
+        } catch (error) {
+          failed.push(photo);
+          if (!firstError) firstError = error.message;
+        }
+      }
+
+      setPhotos(failed);
+      if (photoInput.current) photoInput.current.value = "";
+
+      if (failed.length) {
+        setError(
+          `Report CF-${String(report.id).padStart(4, "0")} was saved, but ` +
+          `${failed.length} photo upload(s) failed. ${firstError} ` +
+          "Retry the remaining photos or continue without them.",
+        );
+        return;
+      }
+
       await onCreated();
-    } catch (e) {
-      setError(e.message);
+    } catch (error) {
+      setError(error.message);
     } finally {
       setBusy(false);
     }
   }
+
   return (
     <section className="panel report-panel">
       <div className="section-heading">
         <div>
-          <span className="eyebrow muted">LET’S GET IT SORTED</span>
+          <span className="eyebrow muted">LET'S GET IT SORTED</span>
           <h2>Report an issue</h2>
           <p className="muted">
-            Tell us what needs attention. Clear details help the right people
-            respond.
+            Tell us what needs attention. Add photos to help the team understand.
           </p>
         </div>
         <span className="illustration-icon">
-          <Wrench size={30} />
+          <Wrench size={30} aria-hidden="true" />
         </span>
       </div>
+
       <form onSubmit={submit}>
-        <Field label="What’s the issue?">
-          <input
-            name="title"
-            required
-            minLength={5}
-            maxLength={120}
-            placeholder="e.g. Projector not working in Room 204"
-          />
-        </Field>
-        <div className="form-grid">
-          <Field label="Category">
-            <select name="category">
-              {Object.keys(categoryColor).map((v) => (
-                <option key={v}>{v}</option>
-              ))}
-            </select>
+        <fieldset
+          className="issue-fields"
+          disabled={busy || Boolean(createdIssue)}
+        >
+          <Field label="What's the issue?">
+            <input
+              name="title"
+              required
+              minLength={5}
+              maxLength={120}
+              placeholder="e.g. Projector not working in Room 204"
+            />
           </Field>
-          <Field label="Priority">
-            <select name="priority" defaultValue="medium">
-              <option value="low">Low — minor inconvenience</option>
-              <option value="medium">Medium — needs attention</option>
-              <option value="high">High — urgent disruption</option>
-            </select>
+
+          <div className="form-grid">
+            <Field label="Category">
+              <select name="category">
+                {Object.keys(categoryColor).map(value => (
+                  <option key={value}>{value}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Priority">
+              <select name="priority" defaultValue="medium">
+                <option value="low">Low - minor inconvenience</option>
+                <option value="medium">Medium - needs attention</option>
+                <option value="high">High - urgent disruption</option>
+              </select>
+            </Field>
+          </div>
+
+          <Field label="Location">
+            <input
+              name="location"
+              required
+              minLength={3}
+              maxLength={120}
+              placeholder="Building, floor, room or equipment number"
+            />
           </Field>
+
+          <Field label="Describe the problem">
+            <textarea
+              name="description"
+              required
+              minLength={15}
+              maxLength={3000}
+              rows={5}
+              placeholder="What happened? When did you notice it? Who is affected?"
+            />
+          </Field>
+        </fieldset>
+
+        <div className="photos-upload">
+          <Field label="Photos (optional)">
+            <input
+              ref={photoInput}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              disabled={busy || uploadedCount >= 3}
+              onChange={selectPhotos}
+              aria-describedby="new-report-photo-help"
+            />
+          </Field>
+
+          <p id="new-report-photo-help" className="small muted">
+            Up to 3 JPEG, PNG or WebP photos. Maximum 5 MiB each.
+          </p>
+
+          {photos.length > 0 && (
+            <>
+              <ul className="selected-report-photos">
+                {photos.map((photo, index) => (
+                  <li key={`${photo.name}-${index}`}>
+                    <span>{photo.name}</span>
+                    <small>{Math.ceil(photo.size / 1024)} KiB</small>
+                  </li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                className="secondary"
+                disabled={busy}
+                onClick={() => {
+                  setPhotos([]);
+                  if (photoInput.current) photoInput.current.value = "";
+                }}
+              >
+                Clear selected photos
+              </button>
+            </>
+          )}
+
+          {uploadedCount > 0 && (
+            <p className="small muted">
+              {uploadedCount} photo(s) uploaded successfully.
+            </p>
+          )}
         </div>
-        <Field label="Location">
-          <input
-            name="location"
-            required
-            minLength={3}
-            maxLength={120}
-            placeholder="Building, floor, room or equipment number"
-          />
-        </Field>
-        <Field label="Describe the problem">
-          <textarea
-            name="description"
-            required
-            minLength={15}
-            maxLength={3000}
-            rows={5}
-            placeholder="What happened? When did you notice it? Who is affected?"
-          />
-        </Field>
-        <p className="muted small">
-          Photo attachments will be available in the S3 checkpoint.
-        </p>
-        {error && (
-          <p role="alert" className="error">
-            {error}
+
+        {createdIssue && (
+          <p className="success" role="status">
+            Report CF-{String(createdIssue.id).padStart(4, "0")} is saved.
+            {busy ? " Processing photos..." : " Retrying will not create another report."}
           </p>
         )}
+
+        {error && <p role="alert" className="error">{error}</p>}
+
         <div className="form-actions">
-          <button type="button" className="secondary" onClick={onCancel}>
-            Cancel
+          <button
+            type="button"
+            className="secondary"
+            disabled={busy}
+            onClick={createdIssue ? () => onCreated() : onCancel}
+          >
+            {createdIssue ? "Continue to my reports" : "Cancel"}
           </button>
           <button className="primary" disabled={busy}>
-            {busy ? "Submitting…" : "Submit report"}
-            <ArrowRight size={17} />
+            {busy
+              ? "Submitting..."
+              : createdIssue
+                ? photos.length
+                  ? "Retry remaining photos"
+                  : "Finish report"
+                : "Submit report"}
+            <ArrowRight size={17} aria-hidden="true" />
           </button>
         </div>
       </form>
@@ -421,6 +558,7 @@ function IssueDetail({ issue, user, staff, onUpdate, onClose }) {
           <strong className="capitalize">{issue.priority}</strong>
         </div>
       </div>
+<PhotoAttachments issue={issue} user={user} api={api} />
       {issue.resolution && (
         <div className="resolution">
           <strong>Resolution notes</strong>

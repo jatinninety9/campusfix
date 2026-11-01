@@ -148,7 +148,7 @@ try {
     .getByRole("button", { name: "Report an issue", exact: true })
     .last()
     .click();
-  await page.getByLabel("What’s the issue?").fill(title);
+  await page.getByLabel(/What.s the issue\?/).fill(title);
   await page
     .getByLabel("Location", { exact: true })
     .fill("Browser test lab 101");

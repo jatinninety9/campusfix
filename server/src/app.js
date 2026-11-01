@@ -1,3 +1,5 @@
+import { attachmentRoutes } from "./attachments.js";
+import { createAttachmentStorage } from "./storage.js";
 import express from "express";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
@@ -105,6 +107,8 @@ app.use("/api", async (req, res, next) => {
   req.user = rows[0];
   next();
 });
+app.locals.attachmentStorage = createAttachmentStorage();
+app.use("/api", attachmentRoutes());
 app.get("/api/auth/me", (req, res) => res.json({ user: req.user }));
 app.post("/api/auth/logout", async (req, res) => {
   await db.query("DELETE FROM sessions WHERE token=$1", [
