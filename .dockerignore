@@ -7,3 +7,4 @@
 **/.aws
 output
 *.log
+compose.s3.local.yaml

@@ -2137,3 +2137,113 @@ select {
     scroll-behavior: auto !important;
   }
 }
+
+/* Issue photo attachments */
+.photos-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+.photos-section .section-heading { margin-bottom: 16px; }
+.photos-empty {
+  padding: 18px;
+  background: #faf6f0;
+  border: 1px dashed #d9c8b4;
+  border-radius: 10px;
+  color: #756451;
+  font-size: 13px;
+}
+.photos-list { list-style: none; padding: 0; margin: 0; }
+.photo-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--border);
+}
+.photo-row > svg { color: #a54b20; flex-shrink: 0; }
+.photo-info { flex: 1; min-width: 0; }
+.photo-info strong {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  color: #514330;
+}
+.photo-info span {
+  display: block;
+  font-size: 11px;
+  margin-top: 4px;
+  color: #756451;
+}
+.photo-row .secondary { min-height: 36px; padding: 8px 10px; }
+.photos-upload {
+  padding: 18px;
+  margin: 18px 0;
+  background: #fff6ec;
+  border: 1px solid #ead5bc;
+  border-radius: 12px;
+}
+.photos-upload .field { margin-bottom: 10px; }
+.photos-upload input { background: white; }
+.photos-upload .primary { margin-top: 14px; }
+.photos-section .error,
+.photos-section .success { margin-top: 16px; margin-bottom: 0; }
+.photo-preview {
+  margin: 18px 0;
+  padding: 12px;
+  border: 1px solid #e5d7c5;
+  border-radius: 12px;
+  background: #faf6f0;
+}
+.photo-preview figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  margin-bottom: 10px;
+}
+.photo-preview figcaption span { min-width: 0; }
+.photo-preview img {
+  display: block;
+  max-width: 100%;
+  max-height: 300px;
+  margin: auto;
+  object-fit: contain;
+  border-radius: 7px;
+}
+@media (max-width: 650px) {
+  .photo-row { gap: 7px; }
+  .photos-upload { padding: 14px; }
+  .photo-row .secondary { font-size: 11px; }
+}
+
+.issue-fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.selected-report-photos {
+  list-style: none;
+  padding: 0;
+  margin: 14px 0;
+}
+.selected-report-photos li {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid #ead5bc;
+  font-size: 12px;
+}
+.selected-report-photos li span {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.selected-report-photos small {
+  color: #756451;
+  white-space: nowrap;
+}

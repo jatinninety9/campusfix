@@ -16,3 +16,4 @@ test-results/
 # Generated previews and local configuration backup
 output/
 compose.database-only.backup.yaml
+compose.s3.local.yaml

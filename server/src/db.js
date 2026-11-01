@@ -1,4 +1,5 @@
 import pg from "pg";
+import { runMigrations } from "./migrations.js";
 export const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 export async function migrate() {
   await db.query(`
@@ -23,4 +24,5 @@ export async function migrate() {
       user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, PRIMARY KEY(issue_id,user_id)
     );
   `);
+return runMigrations(db);
 }
