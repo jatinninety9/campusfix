@@ -17,12 +17,30 @@ const context = await browser.newContext({
 const page = await context.newPage();
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
+const baseUrl = process.env.BASE_URL || "http://127.0.0.1:5173";
+const origin = new URL(baseUrl).origin;
+const networkErrors = [];
+page.on("response", (response) => {
+  const url = new URL(response.url());
+  // An initial anonymous session check is expected to return 401.
+  if (url.origin === origin && response.status() >= 400 &&
+      !(url.pathname === "/api/auth/me" && response.status() === 401)) {
+    networkErrors.push(`${response.status()} ${response.request().method()} ${url.pathname}`);
+  }
+});
+page.on("requestfailed", (request) => {
+  const url = new URL(request.url());
+  if (url.origin === origin) networkErrors.push(`Network failure: ${url.pathname}`);
+});
 const unique = Date.now();
 const email = `browser-${unique}@example.test`;
 const title = `Browser checkpoint report ${unique}`;
 const staffEmail = `browser-staff-${unique}@example.test`;
 const password = process.env.SEED_PASSWORD;
 async function signIn(email) {
+  const portal = email === "admin@campusfix.local" ? "Admin"
+    : email === "staff@campusfix.local" || email === staffEmail ? "Staff" : "Student";
+  await page.getByRole("button", { name: portal, exact: true }).click();
   await page.getByLabel("Email address").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
   const loadedIssues = page.waitForResponse(
@@ -30,7 +48,7 @@ async function signIn(email) {
       response.url().endsWith("/api/issues") &&
       response.request().method() === "GET",
   );
-  await page.getByRole("button", { name: "Sign in to CampusFix" }).click();
+  await page.getByRole("button", { name: `Sign in as ${portal}`, exact: true }).click();
   assert.equal(
     (await loadedIssues).status(),
     200,
@@ -91,7 +109,7 @@ async function noOverflow() {
   );
 }
 try {
-  await page.goto(process.env.BASE_URL || "http://127.0.0.1:5173");
+  await page.goto(baseUrl);
   await page.getByRole("heading", { name: "Good to see you again." }).waitFor();
   await page.screenshot({
     path: "output/previews/login-desktop.png",
@@ -262,6 +280,7 @@ try {
   ).rows[0];
   assert.equal(record.status, "closed");
   assert.deepEqual(errors, [], "No browser runtime errors");
+  assert.deepEqual(networkErrors, [], "No unexpected failed API or asset requests");
   console.log(
     "PASS: real browser registration, login, reporting, assignment, staff resolution, student confirmation, keyboard dialog dismissal, and responsive layouts (375/768/812/1440).",
   );
