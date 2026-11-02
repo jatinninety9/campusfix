@@ -10,6 +10,8 @@
     "dev": "concurrently -n api,web \"npm run dev -w server\" \"npm run dev -w client\"",
     "build": "npm run build -w client",
     "test": "npm run test -w server",
+    "test:deployment": "node scripts/deployment-smoke.js",
+    "test:ui": "node scripts/ui-regression.js",
     "db:init": "npm run db:init -w server",
     "test:browser": "node --env-file=.env scripts/browser-smoke.js",
     "format": "prettier --write client/src server/src server/test scripts package.json client/package.json server/package.json client/vite.config.js client/index.html compose.yaml README.md"

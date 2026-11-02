@@ -4,9 +4,11 @@ import request from "supertest";
 import { app } from "../src/app.js";
 import { db, migrate } from "../src/db.js";
 import { hashPassword } from "../src/password.js";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 const suffix = `${Date.now()}-${process.pid}`;
 const password = "WorkflowTest@2026";
-const emails = ["student", "other", "staff", "admin", "created-staff"].map(
+const emails = ["student", "other", "staff", "admin", "created-staff", "operator-admin", "operator-staff"].map(
   (role) => `test-${role}-${suffix}@example.test`,
 );
 after(async () => {
@@ -92,6 +94,44 @@ test("authenticated complaint lifecycle and permission boundaries", async (t) =>
     await student.get("/api/staff").expect(403);
     const res = await admin.get("/api/staff").expect(200);
     assert.ok(res.body.some((s) => s.id === staffId));
+  });
+  await t.test("operator provisioning creates independent accounts and never overwrites existing users", async () => {
+    const provision = (input) => spawnSync(process.execPath,
+      [fileURLToPath(new URL("../src/create-account.js", import.meta.url))],
+      { input: JSON.stringify(input), encoding: "utf8", env: process.env });
+    for (const [index, role] of [[5, "admin"], [6, "staff"]]) {
+      const input = { name: `Operator ${role}`, email: emails[index], role, password };
+      const created = provision(input);
+      assert.equal(created.status, 0, created.stderr);
+      assert.ok(!created.stdout.includes(password));
+      await request(app).post("/api/auth/login").send(input).expect(200);
+      assert.equal(provision({ ...input, password: "ReplacementPassword123" }).status, 1);
+      await request(app).post("/api/auth/login").send(input).expect(200);
+    }
+    assert.equal(provision({ name: "Do not promote", email: emails[0], role: "admin", password }).status, 1);
+    assert.equal((await db.query("SELECT role FROM users WHERE email=$1", [emails[0]])).rows[0].role, "student");
+    const invalid = provision({ name: "Invalid", email: emails[5], role: "student", password });
+    assert.equal(invalid.status, 1);
+    assert.ok(!invalid.stderr.includes(password));
+  });
+  await t.test("portal selection checks the stored role without creating a mismatched session", async () => {
+    for (const [index, role] of [[0, "student"], [2, "staff"], [3, "admin"]]) {
+      for (const portal of ["student", "staff", "admin"]) {
+        const agent = request.agent(app);
+        const response = await agent.post("/api/auth/login")
+          .send({ email: emails[index], password, role: portal })
+          .expect(portal === role ? 200 : 403);
+        if (portal === role) {
+          assert.equal(response.body.user.role, role);
+          await agent.get("/api/auth/me").expect(200);
+        } else {
+          assert.equal(response.headers["set-cookie"], undefined);
+          await agent.get("/api/auth/me").expect(401);
+        }
+      }
+    }
+    await request(app).post("/api/auth/login")
+      .send({ email: emails[0], password, role: "superadmin" }).expect(400);
   });
   await t.test(
     "only admins can create staff accounts; new staff can sign in",

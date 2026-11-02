@@ -101,8 +101,10 @@ function Badge({ status }) {
 }
 function Auth({ onLogin }) {
   const [register, setRegister] = useState(false),
+    [portal, setPortal] = useState("student"),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const portalName = { student: "Student", staff: "Staff", admin: "Admin" }[portal];
   async function submit(e) {
     e.preventDefault();
     setError("");
@@ -113,7 +115,7 @@ function Auth({ onLogin }) {
         (
           await api(`/auth/${register ? "register" : "login"}`, {
             method: "POST",
-            body: JSON.stringify(values),
+            body: JSON.stringify(register ? values : { ...values, role: portal }),
           })
         ).user,
       );
@@ -161,15 +163,34 @@ function Auth({ onLogin }) {
       </section>
       <section className="auth-form-wrap">
         <div className="auth-form">
-          <span className="eyebrow muted">YOUR CAMPUS. YOUR VOICE.</span>
+          <span className="eyebrow muted">{portalName.toUpperCase()} PORTAL</span>
           <h2>
             {register ? "Make yourself at home." : "Good to see you again."}
           </h2>
           <p className="muted">
             {register
               ? "Create your student account to start making a difference."
-              : "Sign in to see what’s happening around campus."}
+              : portal === "student"
+                ? "Report issues and follow every update. Sign in with your student email."
+                : portal === "staff"
+                  ? "Sign in with your assigned staff account to manage repairs."
+                  : "Sign in with your administrator account to manage campus operations."}
           </p>
+          <div className="portal-picker" role="group" aria-label="Choose your sign-in portal">
+            {["student", "staff", "admin"].map(role => (
+              <button
+                key={role}
+                type="button"
+                aria-pressed={portal === role}
+                disabled={busy}
+                onClick={() => { setPortal(role); setRegister(false); setError(""); }}
+              >
+                {role === "student" ? <UserRound size={17} /> : role === "staff" ? <Wrench size={17} /> : <ShieldCheck size={17} />}
+                {{ student: "Student", staff: "Staff", admin: "Admin" }[role]}
+              </button>
+            ))}
+          </div>
+          {portal === "student" && (
           <div className="auth-tabs">
             <button
               className={!register ? "selected" : ""}
@@ -190,7 +211,8 @@ function Auth({ onLogin }) {
               Create account
             </button>
           </div>
-          <form onSubmit={submit}>
+          )}
+          <form key={portal} onSubmit={submit} aria-label={`${portalName} ${register ? "registration" : "sign in"}`}>
             {register && (
               <Field label="Full name">
                 <input
@@ -209,7 +231,7 @@ function Auth({ onLogin }) {
                 type="email"
                 autoComplete="email"
                 required
-                placeholder="you@college.edu"
+                placeholder={portal === "student" ? "you@college.edu" : portal === "staff" ? "name.staff@campusfix.com" : "Your administrator email"}
               />
             </Field>
             <Field label="Password">
@@ -234,21 +256,15 @@ function Auth({ onLogin }) {
                 ? "Please wait…"
                 : register
                   ? "Create student account"
-                  : "Sign in to CampusFix"}
+                  : `Sign in as ${portalName}`}
               <ArrowRight size={18} />
             </button>
           </form>
           <p className="auth-note">
-            <ShieldCheck size={16} /> Staff and admin accounts are provisioned
-            separately.
+            <ShieldCheck size={16} /> {portal === "student"
+              ? "New here? Create a student account using your existing email."
+              : "Accounts are assigned by your campus administrator. Contact them if you need access."}
           </p>
-          <div className="local-note">
-            <strong>Local assessment preview</strong>
-            <p>
-              Sample accounts are listed in the project README. This build uses
-              seeded demonstration data.
-            </p>
-          </div>
         </div>
       </section>
     </div>
@@ -487,18 +503,22 @@ function IssueForm({ onCreated, onCancel }) {
     </section>
   );
 }
-function IssueDetail({ issue, user, staff, onUpdate, onClose }) {
+function IssueDetail({ issue, user, staff, onUpdate, onClose, refreshing, refreshError }) {
   const dialog = useRef(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [note, setNote] = useState(""),
     [assignment, setAssignment] = useState(String(issue.assignee_id || ""));
   useEffect(() => {
+    setAssignment(String(issue.assignee_id || ""));
+  }, [issue.assignee_id]);
+  useEffect(() => {
     const before = document.activeElement;
     dialog.current.showModal();
     return () => before?.focus();
   }, []);
   async function change(body) {
+    if (refreshing || refreshError) return;
     setBusy(true);
     setError("");
     try {
@@ -540,6 +560,15 @@ function IssueDetail({ issue, user, staff, onUpdate, onClose }) {
         {issue.location}
       </p>
       <p className="description">{issue.description}</p>
+      {refreshing && <p className="muted small" role="status">Updating report details…</p>}
+      {refreshError && (
+        <div className="error" role="alert">
+          {refreshError}
+          <button className="text-button" onClick={onUpdate} disabled={refreshing}>
+            Retry report refresh
+          </button>
+        </div>
+      )}
       <div className="detail-meta">
         <div>
           <small>Reported by</small>
@@ -582,7 +611,7 @@ function IssueDetail({ issue, user, staff, onUpdate, onClose }) {
           </Field>
           <button
             className="secondary"
-            disabled={busy || !assignment}
+            disabled={busy || refreshing || Boolean(refreshError) || !assignment}
             onClick={() => change({ assignee_id: Number(assignment) })}
           >
             Assign
@@ -604,7 +633,7 @@ function IssueDetail({ issue, user, staff, onUpdate, onClose }) {
             <button
               className="secondary"
               disabled={
-                busy || !issue.assignee_id || issue.status === "in_progress"
+                busy || refreshing || Boolean(refreshError) || !issue.assignee_id || issue.status === "in_progress"
               }
               onClick={() => change({ status: "in_progress" })}
             >
@@ -612,7 +641,7 @@ function IssueDetail({ issue, user, staff, onUpdate, onClose }) {
             </button>
             <button
               className="primary"
-              disabled={busy || note.trim().length < 10}
+              disabled={busy || refreshing || Boolean(refreshError) || note.trim().length < 10}
               onClick={() => change({ status: "resolved", resolution: note })}
             >
               Mark resolved
@@ -633,14 +662,14 @@ function IssueDetail({ issue, user, staff, onUpdate, onClose }) {
             <div className="form-actions">
               <button
                 className="secondary"
-                disabled={busy}
+                disabled={busy || refreshing || Boolean(refreshError)}
                 onClick={() => change({ status: "open" })}
               >
                 Reopen issue
               </button>
               <button
                 className="primary"
-                disabled={busy}
+                disabled={busy || refreshing || Boolean(refreshError)}
                 onClick={() => change({ status: "closed" })}
               >
                 Confirm fix
@@ -665,7 +694,7 @@ function App() {
     [page, setPage] = useState("overview"),
     [filter, setFilter] = useState("all"),
     [search, setSearch] = useState(""),
-    [selected, setSelected] = useState(null),
+    [selectedId, setSelectedId] = useState(null),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [loading, setLoading] = useState(false);
@@ -688,7 +717,9 @@ function App() {
     setLoading(true);
     setError("");
     try {
-      setIssues(await api("/issues"));
+      const latestIssues = await api("/issues");
+      setIssues(latestIssues);
+      setSelectedId(current => latestIssues.some(issue => issue.id === current) ? current : null);
       if (user?.role === "admin") setStaff(await api("/staff"));
     } catch (e) {
       setError(e.message);
@@ -705,6 +736,10 @@ function App() {
     setSearch("");
     setNotice("");
   }
+  function openIssue(issue) {
+    setSelectedId(issue.id);
+  }
+  const selected = issues.find(issue => issue.id === selectedId);
   if (boot)
     return (
       <div className="loading-screen">
@@ -794,7 +829,7 @@ function App() {
       setPage("overview");
       setNotice("");
       setStaff([]);
-      setSelected(null);
+      setSelectedId(null);
     } catch (e) {
       setError(e.message);
     }
@@ -903,7 +938,7 @@ function App() {
             </strong>
           </div>
           <span className="environment">
-            <span className="dot" /> Local development
+            <span className="dot" /> Campus workspace
           </span>
         </header>
         <main id="main">
@@ -966,7 +1001,7 @@ function App() {
                     issues={issues}
                     staffCount={staff.length}
                     onNavigate={navigate}
-                    onOpen={setSelected}
+                    onOpen={openIssue}
                   />
                   <section
                     className="stat-grid"
@@ -1195,7 +1230,7 @@ function App() {
                           <div className="issue-main">
                             <button
                               className="issue-title"
-                              onClick={() => setSelected(issue)}
+                              onClick={() => openIssue(issue)}
                             >
                               {issue.title}
                             </button>
@@ -1232,7 +1267,7 @@ function App() {
                           <button
                             className="icon-button row-open"
                             aria-label={`View ${issue.title}`}
-                            onClick={() => setSelected(issue)}
+                            onClick={() => openIssue(issue)}
                           >
                             <ChevronRight size={18} />
                           </button>
@@ -1262,7 +1297,7 @@ function App() {
               </section>
               <footer className="page-footer">
                 <span>Small actions. Shared responsibility.</span>
-                <span>CampusFix · Development checkpoint 02</span>
+                <span>CampusFix · Campus care, connected</span>
               </footer>
             </>
           )}
@@ -1275,7 +1310,9 @@ function App() {
           user={user}
           staff={staff}
           onUpdate={load}
-          onClose={() => setSelected(null)}
+          onClose={() => setSelectedId(null)}
+          refreshing={loading}
+          refreshError={error}
         />
       )}
     </div>

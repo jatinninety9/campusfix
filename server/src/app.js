@@ -85,12 +85,18 @@ app.post("/api/auth/register", registrationLimiter, async (req, res) => {
   res.status(201).json({ user: await login(res, result.rows[0]) });
 });
 app.post("/api/auth/login", loginLimiter, async (req, res) => {
-  const input = account.parse(req.body);
+  const input = account.extend({
+    role: z.enum(["student", "staff", "admin"]).optional(),
+  }).parse(req.body);
   const { rows } = await db.query("SELECT * FROM users WHERE email=$1", [
     input.email,
   ]);
   if (!rows[0] || !verifyPassword(input.password, rows[0].password))
     return res.status(401).json({ error: "Email or password is incorrect." });
+  if (input.role && input.role !== rows[0].role)
+    return res.status(403).json({
+      error: "This account cannot sign in through the selected portal. Choose the portal assigned to your account.",
+    });
   res.json({ user: await login(res, rows[0]) });
 });
 app.use("/api", async (req, res, next) => {
@@ -278,6 +284,8 @@ app.use((err, req, res, next) => {
     return res.status(409).json({ error: "This email is already registered." });
   if (err.type === "entity.parse.failed")
     return res.status(400).json({ error: "Invalid JSON." });
+  if (err.type === "entity.too.large")
+    return res.status(413).json({ error: "JSON requests must be 32 KiB or smaller." });
   console.error(err.message);
   res.status(500).json({ error: "Something went wrong. Please try again." });
 });

@@ -59,8 +59,14 @@ jobs:
       - name: Check application health through Nginx
         run: curl --fail --show-error http://127.0.0.1:8095/api/health
 
+      - name: Check deployed assets and API routing through Nginx
+        run: npm run test:deployment
+
       - name: Run browser workflow against containers
         run: npm run test:browser
+
+      - name: Check production labels and report refresh races
+        run: npm run test:ui
 
       - name: Show diagnostics on failure
         if: failure()

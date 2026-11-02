@@ -1461,6 +1461,31 @@ select {
   border-radius: 10px;
   margin: 28px 0;
 }
+.portal-picker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 24px 0;
+}
+.portal-picker button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 48px;
+  padding: 8px;
+  background: white;
+  color: #594b3e;
+  border: 1px solid #dfd1c1;
+  border-radius: 10px;
+  font-size: 12px;
+}
+.portal-picker button[aria-pressed="true"] {
+  color: #98380c;
+  background: #fff0df;
+  border-color: #b9430e;
+  font-weight: 650;
+}
 .auth-tabs button {
   flex: 1;
   min-height: 38px;
@@ -1487,23 +1512,6 @@ select {
   color: #83715b;
   font-size: 10px !important;
   margin-top: 21px !important;
-}
-.local-note {
-  padding: 15px 18px;
-  background: #faf4ea;
-  border: 1px solid #eaddc9;
-  border-radius: 10px;
-  margin-top: 30px;
-}
-.local-note strong {
-  color: #7a5734;
-  font-size: 11px;
-}
-.local-note p {
-  color: #786047;
-  font-size: 11px;
-  line-height: 1.8;
-  margin-top: 5px;
 }
 .loading-screen {
   min-height: 100vh;
