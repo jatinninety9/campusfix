@@ -1,0 +1,75 @@
+name: AWS CD Connection Check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      id-token: write
+      contents: read
+
+    env:
+      INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+      AWS_PAGER: ""
+
+    steps:
+      - name: Authenticate to AWS through OIDC
+        uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          allowed-account-ids: "974284323787"
+          role-session-name: campusfix-connection-check
+
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Check EC2 through SSM
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cat > /tmp/ssm-check.json <<'JSON'
+          {
+            "commands": [
+              "set -eu",
+              "whoami",
+              "hostname",
+              "sudo -u ubuntu git -C /home/ubuntu/campusfix log -1 --oneline",
+              "docker ps --format 'table {{.Names}}\t{{.Status}}'",
+              "curl --fail --silent --show-error --max-time 20 http://127.0.0.1:8095/api/health"
+            ],
+            "executionTimeout": ["120"]
+          }
+          JSON
+
+          command_id=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --parameters file:///tmp/ssm-check.json \
+            --timeout-seconds 120 \
+            --query Command.CommandId \
+            --output text)
+
+          echo "SSM command: $command_id"
+
+          wait_result=0
+          aws ssm wait command-executed \
+            --command-id "$command_id" \
+            --instance-id "$INSTANCE_ID" || wait_result=$?
+
+          aws ssm get-command-invocation \
+            --command-id "$command_id" \
+            --instance-id "$INSTANCE_ID" \
+            --query '{Status:Status,ResponseCode:ResponseCode,Output:StandardOutputContent,Error:StandardErrorContent}' \
+            --output json
+
+          exit "$wait_result"
