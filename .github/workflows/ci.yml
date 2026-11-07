@@ -12,8 +12,7 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   verify:
     name: Tests and Docker verification
@@ -28,6 +27,18 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v6
+	- name: Validate deployment script
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/deploy-ec2.sh
+
+          for invalid_sha in "" "main" "invalid"; do
+            if bash scripts/deploy-ec2.sh "$invalid_sha"; then
+              echo "ERROR: Deployment script accepted an invalid commit."
+              exit 1
+            fi
+          done
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
