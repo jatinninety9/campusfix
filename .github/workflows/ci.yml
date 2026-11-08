@@ -27,7 +27,7 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v6
-	- name: Validate deployment script
+      - name: Validate deployment script
         shell: bash
         run: |
           set -euo pipefail
