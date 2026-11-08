@@ -143,7 +143,7 @@ jobs:
           assert b"\r" not in script, "Deployment script must use LF endings"
           encoded = base64.b64encode(script).decode("ascii")
 
-        command = (
+          command = (
               "set -eu; "
               "script_file=$(mktemp /tmp/campusfix-deploy.XXXXXX); "
               "trap 'rm -f \"$script_file\"' EXIT; "
