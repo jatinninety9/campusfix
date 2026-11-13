@@ -3,27 +3,48 @@ import { createAttachmentStorage } from "./storage.js";
 import express from "express";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
-import { rateLimit } from "express-rate-limit";
+import { rateLimit, ipKeyGenerator } from "express-rate-limit";
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { db } from "./db.js";
 import { hashPassword, verifyPassword } from "./password.js";
+import { createCsrfProtection } from "./csrf.js";
 
 export const app = express();
+// Default to trusting no forwarded addresses. Operators must review their proxy
+// chain and network access before opting into an address/subnet allowlist.
+if (process.env.TRUSTED_PROXIES) app.set("trust proxy", process.env.TRUSTED_PROXIES.split(",").map(value => value.trim()));
 app.use(helmet());
+app.use("/api", rateLimit({
+  windowMs: 60 * 1000,
+  limit: 600,
+  keyGenerator: req => ipKeyGenerator(req.ip),
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { error: "Too many API requests. Try again shortly." },
+}));
 app.use(express.json({ limit: "32kb" }));
 app.use(cookieParser());
-// Same-origin browser writes only; API clients without Origin remain usable for tests/CLI.
+const csrf = createCsrfProtection({ production: process.env.NODE_ENV === "production" });
+// Origin checks are defense in depth; all clients must also send a CSRF token.
 app.use((req, res, next) => {
+  if (!["GET", "HEAD", "OPTIONS"].includes(req.method) && req.get("Sec-Fetch-Site") === "cross-site")
+    return res.status(403).json({ error: "Cross-origin request blocked." });
   if (!["GET", "HEAD", "OPTIONS"].includes(req.method) && req.headers.origin) {
     try {
-      if (new URL(req.headers.origin).host !== req.headers.host)
+      const origin = new URL(req.headers.origin);
+      const protocol = process.env.NODE_ENV === "production" ? "https:" : `${req.protocol}:`;
+      if (origin.host !== req.headers.host || origin.protocol !== protocol || origin.origin !== req.headers.origin)
         return res.status(403).json({ error: "Cross-origin request blocked." });
     } catch {
       return res.status(403).json({ error: "Invalid origin." });
     }
   }
   next();
+});
+app.use(csrf.csrfProtection);
+app.get("/api/auth/csrf", (req, res) => {
+  res.set("Cache-Control", "no-store").json({ csrfToken: csrf.generateCsrfToken(req, res) });
 });
 const digest = (value) => createHash("sha256").update(value).digest("hex");
 const cookieOptions = {
@@ -50,6 +71,8 @@ const loginLimiter = rateLimit({
   standardHeaders: "draft-8",
   legacyHeaders: false,
   skipSuccessfulRequests: true,
+  // Account-based failures remain independent when several users share a proxy.
+  keyGenerator: req => digest(String(req.body?.email || "").trim().toLowerCase()),
   message: {
     error: "Too many failed sign-in attempts. Try again in 15 minutes.",
   },
@@ -57,6 +80,7 @@ const loginLimiter = rateLimit({
 const registrationLimiter = rateLimit({
   windowMs: 900000,
   limit: 20,
+  keyGenerator: req => ipKeyGenerator(req.ip),
   standardHeaders: "draft-8",
   legacyHeaders: false,
   message: {
@@ -274,6 +298,8 @@ app.patch("/api/issues/:id", async (req, res) => {
 });
 app.use((req, res) => res.status(404).json({ error: "Endpoint not found." }));
 app.use((err, req, res, next) => {
+  if (err.code === "EBADCSRFTOKEN")
+    return res.status(403).json({ error: "Security token is missing or expired. Refresh and try again.", code: "CSRF_INVALID" });
   if (err instanceof z.ZodError)
     return res.status(400).json({
       error: err.issues

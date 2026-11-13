@@ -12,6 +12,7 @@
     "@aws-sdk/client-s3": "^3.1161.0",
     "@aws-sdk/s3-request-presigner": "^3.1161.0",
     "cookie-parser": "^1.4.7",
+    "csrf-csrf": "^4.1.0",
     "express": "^5.1.0",
     "express-rate-limit": "^8.1.0",
     "file-type": "^22.3.0",
