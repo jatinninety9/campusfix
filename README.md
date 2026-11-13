@@ -91,6 +91,8 @@ On Linux, Playwright may need `npx playwright install --with-deps chromium`; use
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR and [SECURITY.md](SECURITY.md) for private vulnerability reporting and testing boundaries.
 
+API clients must follow the [CSRF handshake and rate-limit contract](docs/API-Security.md). State-changing requests require an explicit token header, including login and photo uploads.
+
 PR checks use disposable resources. The upstream deployment job runs only after verification succeeds for a push to upstream `main`; fork deployments are skipped. Deployment uses short-lived OIDC credentials. Contributors do not need production access. Merged main changes can trigger deployment, so maintainers must review code, workflow and dependency changes before merging.
 
 ## Current limitations
