@@ -17,3 +17,24 @@ test-results/
 output/
 compose.database-only.backup.yaml
 compose.s3.local.yaml
+
+# Database backups and local production configuration
+*.dump
+*.sql.gz
+*.sql.bak
+*.backup
+compose.ec2.yaml
+compose.https.yaml
+compose.pgadmin.yaml
+compose.gateway.yaml
+Caddyfile
+
+# Local assessment/review material; publish only after privacy review
+.archify/
+docs/design-references/
+docs/research/
+docs/security-review/
+docs/CampusFix-Documentation-Index.md
+docs/CampusFix-Explanation-Sections-01-02.md
+docs/CampusFix-Pause-Checkpoint-*.md
+docs/CampusFix-Verified-Checkpoint-*.md
