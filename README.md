@@ -1,63 +1,106 @@
 # CampusFix
 
-A campus maintenance platform built for a DevOps lab assessment. Students report problems, staff resolve them, and administrators coordinate assignments. The backend uses JavaScript (Node.js + Express) and PostgreSQL. The responsive React dashboard uses real API records.
+A campus maintenance application built for a DevOps assessment. Students report issues, administrators assign staff, and assigned staff resolve reports with notes. Reporters can confirm a fix or reopen an issue.
 
-## Current development — local application
+## Features and technology
 
-Implemented: student registration, cookie-based sessions, password hashing, role-based authorization, complaint creation/search/filtering, duplicate support, staff assignment, resolution notes, student verification/reopening, and database-backed dashboard counts and category chart. The 29 October visual revision uses orange, white, and warm ivory, with Outfit headings and DM Sans body text. Admins have statistics-first dispatch and a Manage staff page; staff have a workbench with assignment-stage filters; students have an illustrated reporting overview and fixes awaiting confirmation. Login, forms, dialogs, and charts share the light theme.
+- Separate Student, Staff and Admin portals with server-side role and ownership checks.
+- Student registration, cookie sessions, password hashing and logout.
+- Categories, priorities, locations, search, filters, support votes and role-specific dashboards.
+- Administrator staff provisioning and assignment, staff resolution and reporter confirmation.
+- Optional private S3 photos: JPEG, PNG or WebP, up to three per issue and 5 MiB each, with short-lived viewing links.
+- PostgreSQL migrations, Docker images, multi-service Compose and automated CI/CD.
 
-Admins can create staff accounts from **Manage staff**, using a name, unique email, and initial password (10–128 characters). New staff can sign in immediately and appear in the assignment list. Staff directory cards show current active assignment counts. No invitation email or password-reset flow is implemented yet; initial passwords must be shared privately. Only admins can create staff accounts; public registration always creates students.
+| Layer | Tools |
+| --- | --- |
+| Frontend | React, Vite, JavaScript, CSS, Lucide icons, Recharts |
+| Backend | Node.js 24, Express, Zod |
+| Data | PostgreSQL 17, optional Amazon S3 |
+| Verification | Node test runner, Supertest, Playwright |
+| Delivery | Docker Compose, GitHub Actions, AWS OIDC/STS and SSM |
 
-This checkpoint uses **sample campus complaints** and local accounts. It does not provision AWS resources. S3 attachments, QR reporting, complete application containerisation, CI/CD, and EC2 deployment remain later checkpoints. Docker Compose currently runs the database only.
+The maintained deployment runs on AWS EC2 with PostgreSQL on the instance and photos in S3. Contributors can run locally without AWS credentials. Production configuration is operator-managed and is not distributed with the local Compose setup.
 
 ## Run locally
 
-Requirements: Node.js 22.12+ (24 supported), npm, and Docker Desktop with Linux containers.
+Install Node.js 24, npm, Git and Docker with Linux containers. Start Docker Desktop before using Compose on Windows.
+
+These commands use Windows PowerShell. On Linux/macOS, use `cp .env.example .env` and `npm` instead of `Copy-Item` and `npm.cmd`.
 
 ```powershell
+git clone https://github.com/jatinninety9/campusfix.git
+cd campusfix
 Copy-Item .env.example .env
-npm install
+npm.cmd ci
 docker compose up -d db --wait
-npm run db:init
-npm run dev
+npm.cmd run db:init
+npm.cmd run dev
 ```
 
-Open http://localhost:5173. API: http://localhost:4000/api/health. The database is bound to localhost:54329 and persists in a Docker volume. The frontend proxies `/api` to Express, so browser requests use a single origin.
+Copy the example only in a new checkout; do not overwrite an existing `.env`. The development website is http://localhost:5173. API health is http://localhost:4000/api/health. PostgreSQL binds to localhost port 54329 and persists in a Docker volume. Vite proxies `/api` to Express.
 
 ### Local demonstration accounts
 
-| Role    | Email                   |
-| ------- | ----------------------- |
-| Student | student@campusfix.local |
-| Staff   | staff@campusfix.local   |
-| Admin   | admin@campusfix.local   |
+| Portal | Email |
+| --- | --- |
+| Student | `student@campusfix.local` |
+| Staff | `staff@campusfix.local` |
+| Admin | `admin@campusfix.local` |
 
-Password for newly seeded accounts: the `SEED_PASSWORD` in your local `.env` (example: `CampusFix@2026`). These are local demonstration credentials and must not be deployed publicly. Seeding preserves existing users and issues; changing `SEED_PASSWORD` does not reset existing passwords. Public registration always creates a student, regardless of request fields.
+Their initial password comes from `SEED_PASSWORD` in your local `.env`. These are disposable demonstration accounts, not production credentials. Seeding preserves existing users; changing the environment value does not reset their passwords. Public registration always creates a student.
 
-### Verification
+### Containerized application
+
+After preparing `.env`, installing dependencies and seeding as above, stop the development process if running and start the complete local stack:
 
 ```powershell
-npm test
-npm run build
+docker compose up -d --build --wait
 ```
 
-With both development servers running, run `npm run test:browser` for the real browser workflow. It uses installed Microsoft Edge by default; set `BROWSER_CHANNEL=chrome` to use installed Chrome. Desktop and mobile screenshots are saved in `output/previews/`. Browser-created test accounts and reports are removed after the run.
+Open http://127.0.0.1:8095. Compose runs PostgreSQL, the API and Nginx/frontend. This is a local development configuration, not an internet-facing production template.
 
-Verified for the current revision: the PostgreSQL integration suite passes (11 tests), the production frontend builds, and the real browser workflow passes at desktop/tablet/mobile sizes with no page runtime errors. This includes admin-only staff creation, new-staff login, and a regression check for login rate limiting. Successful logins, logout, and session checks do not consume the failed-login allowance; registration has a separate limiter. AWS deployment and S3 integration have not been exercised by these checks.
+S3 is optional and is not configured by `.env.example`. Photo operations require a separately configured test bucket, region and credentials available to the API process. Do not use the maintained deployment's bucket or credentials for contributor testing.
 
-The test suite requires the local database and creates uniquely named test users. It deletes its own records after completing. Tests cover the real PostgreSQL complaint lifecycle, privilege escalation, authorization boundaries, input validation, support toggling, cross-origin writes, and session invalidation.
+## Verification
 
-### Scope and behavior
+Use a disposable local database. Backend and browser suites create and delete their own test records. Start the local database and seed demo accounts as above, then run:
 
-- All signed-in campus users can view complaint titles, descriptions, locations, and reporter names. Do not include sensitive personal details in reports. Students can support reports; only a report's owner can confirm/reopen its resolved status.
-- Admins assign staff. Staff may start or resolve only issues assigned to them. Resolution requires notes. The default resolution target is three days from creation.
-- Sessions expire after seven days. Only session-token hashes are stored in PostgreSQL. Cookies are HTTP-only and SameSite=Lax; production cookies require HTTPS.
-- Admin dashboard figures summarize all campus reports; student and staff figures summarize their own reports or assigned work. The student campus feed and All issues view remain shared. Resolution time measures creation to the latest resolution following any reopening.
-- Web fonts load from Google Fonts, with local sans-serif fallbacks. Charts do not animate; reduced-motion preferences are respected.
-- Development servers bind to loopback. Do not expose the development server as a production deployment.
+```powershell
+npm.cmd run build
+npm.cmd test
+npx.cmd playwright install chromium
+docker compose up -d --build --wait
+$env:BROWSER_CHANNEL = 'chromium'
+$env:BASE_URL = 'http://127.0.0.1:8095'
+npm.cmd run test:deployment
+npm.cmd run test:browser
+npm.cmd run test:ui
+Remove-Item Env:BASE_URL -ErrorAction SilentlyContinue
+Remove-Item Env:BROWSER_CHANNEL -ErrorAction SilentlyContinue
+```
 
-## Planned DevOps evidence
+On Linux, Playwright may need `npx playwright install --with-deps chromium`; use `export`/`unset` for the environment variables.
 
-Linux/EC2/SSH (1–2), S3/IAM (3), Git/GitHub branches and pull requests (6–7), Docker images (11), GitHub Actions (13), multi-service Compose (14), and integrated deployment pipeline (15). The JavaScript S3 integration does not claim the Python/boto3 practical (4).
+- Backend tests cover authentication, permissions, complaint lifecycle, validation, migrations and attachment APIs with simulated storage.
+- Browser tests exercise role workflows, keyboard behavior and responsive layouts.
+- UI regressions use controlled API responses for refresh and presentation behavior.
+- `test:deployment` is a read-only check of a running website's HTML, assets, database health and protected API routing. It does not deploy the application or establish load capacity.
+- CI uses simulated storage for attachment tests and does not require AWS credentials for PR verification.
 
-See [the development checkpoint guide](docs/CampusFix-Development-Checkpoint-Guide.md) for setup, role workflows, tests, troubleshooting, and the boundary between completed local work and pending DevOps deployment.
+## Contributions and deployment
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR and [SECURITY.md](SECURITY.md) for private vulnerability reporting and testing boundaries.
+
+PR checks use disposable resources. The upstream deployment job runs only after verification succeeds for a push to upstream `main`; fork deployments are skipped. Deployment uses short-lived OIDC credentials. Contributors do not need production access. Merged main changes can trigger deployment, so maintainers must review code, workflow and dependency changes before merging.
+
+## Current limitations
+
+- Signed-in users share report and photo visibility. Do not use the application for confidential or sensitive personal complaints.
+- Email/campus membership verification, invitations, password-reset UI and MFA are not implemented.
+- Application and database share one EC2 failure domain. Saved deployment backups/images are local recovery artifacts; automatic rollback and off-instance restoration have not been verified.
+- No penetration-test certification, uptime SLA or measured concurrency limit is claimed.
+- Earlier `docs/` files describe historical checkpoints; this README summarizes the current setup and scope.
+
+## License
+
+CampusFix is licensed under the [MIT License](LICENSE). Third-party dependencies, fonts and assets remain subject to their respective licenses.
