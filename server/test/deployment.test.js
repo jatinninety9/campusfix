@@ -1,6 +1,6 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import request from "supertest";
+import request from "./helpers/csrf-request.js";
 import { createHash } from "node:crypto";
 import { db, migrate } from "../src/db.js";
 import { hashPassword } from "../src/password.js";
@@ -50,7 +50,7 @@ test("production API contract before address migration", async (t) => {
   });
 
   await t.test("foreign, malformed and null origins fail without changing sessions", async () => {
-    for (const value of ["https://attacker.example", "not-a-url", "null"]) {
+    for (const value of ["https://attacker.example", `http://${host}`, `https://${host}:444`, "not-a-url", "null"]) {
       await request(app).post("/api/auth/logout")
         .set("Host", host).set("Origin", value).set("Cookie", cookie).expect(403);
     }
