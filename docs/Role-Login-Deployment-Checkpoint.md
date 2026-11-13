@@ -2,7 +2,7 @@
 
 Student, Staff and Admin have explicit sign-in portals. Only students can register publicly. The server checks the selected portal against the stored account role before creating a session. Existing clients without a portal field continue to work; they receive only their stored role's permissions.
 
-Keep `chauhanjatin0404@gmail.com` as the existing administrator. Create `admin@campusfix.com` as a separate administrator with its own password. Do not change existing users or passwords. Suggested staff identifiers: `firstname.staff@campusfix.com` (add a surname when necessary); students keep their existing college email addresses. The domain format grants no privileges, and these identifiers are not provisioned mailboxes.
+Keep the existing administrator account. Create `admin@campusfix.com` as a separate administrator with its own password. Do not change existing users or passwords as part of this historical provisioning procedure. Suggested staff identifiers: `firstname.staff@campusfix.com` (add a surname when necessary); students keep their existing college email addresses. The domain format grants no privileges, and these identifiers are not provisioned mailboxes.
 
 ## Publish first
 
