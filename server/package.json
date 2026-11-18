@@ -14,7 +14,7 @@
     "cookie-parser": "^1.4.7",
     "csrf-csrf": "^4.1.0",
     "express": "^5.1.0",
-    "express-rate-limit": "^8.1.0",
+    "express-rate-limit": "^8.7.4",
     "file-type": "^22.3.0",
     "helmet": "^8.1.0",
     "multer": "^2.5.0",
