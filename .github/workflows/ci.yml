@@ -64,6 +64,9 @@ jobs:
       - name: Build images and start containers
         run: docker compose up -d --build --wait --wait-timeout 180
 
+      - name: Verify non-root image with restrictive source permissions
+        run: python3 scripts/test-image-permissions.py
+
       - name: Initialize temporary database and sample accounts
         run: npm run db:init
 

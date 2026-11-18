@@ -74,7 +74,12 @@ done
 
 test -s "$backup_dir/database.dump"
 
-git merge --ff-only "$target_sha"
+# Source files must remain readable by non-root container users. Keep the
+# restrictive outer umask for recovery files, but not for Git's checkout.
+(
+  umask 022
+  git merge --ff-only "$target_sha"
+)
 test "$(git rev-parse HEAD)" = "$target_sha"
 
 # Build before replacing the running application containers.

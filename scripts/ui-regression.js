@@ -44,6 +44,7 @@ async function scenario(name, run) {
   await context.route("**/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     const reply = (body, status = 200) => route.fulfill({ status, json: body });
+    if (path === "/api/auth/csrf") return reply({ csrfToken: "mock-csrf-token" });
     if (path === "/api/auth/me")
       return reply(
         state.user ? { user: state.user } : { error: "Please sign in." },
