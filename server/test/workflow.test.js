@@ -1,6 +1,6 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import request from "supertest";
+import request from "./helpers/csrf-request.js";
 import { app } from "../src/app.js";
 import { db, migrate } from "../src/db.js";
 import { hashPassword } from "../src/password.js";
@@ -322,6 +322,10 @@ test("authenticated complaint lifecycle and permission boundaries", async (t) =>
       }
       assert.ok(blocked, "Repeated failed logins must still be rate limited");
       assert.ok(Number(blocked.headers["retry-after"]) > 0);
+      // Failed attempts for one account must not lock out another account
+      // behind the same reverse proxy or campus network.
+      await request(app).post("/api/auth/login")
+        .send({ email: emails[1], password }).expect(200);
       await student.get("/api/auth/me").expect(200);
       await student.post("/api/auth/logout").expect(200);
       await student.get("/api/auth/me").expect(401);
