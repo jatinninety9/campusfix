@@ -34,12 +34,25 @@ import CampusScene from "./CampusScene.jsx";
 async function api(path, options = {}) {
   let response;
   try {
+    const method = (options.method || "GET").toUpperCase();
+    let csrfHeaders = {};
+    if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
+      const tokenResponse = await fetch("/api/auth/csrf", {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      const token = await tokenResponse.json();
+      if (!tokenResponse.ok || typeof token.csrfToken !== "string")
+        throw new Error("Cannot obtain a security token.");
+      csrfHeaders = { "X-CSRF-Token": token.csrfToken };
+    }
     response = await fetch(`/api${path}`, {
       ...options,
-      headers: {  ...(options.body instanceof FormData
-    ? {}
-    : { "Content-Type": "application/json" }),
-  ...options.headers, },
+      headers: {
+        ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
+        ...options.headers,
+        ...csrfHeaders,
+      },
       credentials: "same-origin",
     });
   } catch {

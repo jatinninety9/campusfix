@@ -1,6 +1,6 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import request from "supertest";
+import request from "./helpers/csrf-request.js";
 import { app } from "../src/app.js";
 import { db, migrate } from "../src/db.js";
 import { hashPassword } from "../src/password.js";
