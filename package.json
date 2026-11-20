@@ -17,7 +17,7 @@
     "format": "prettier --write client/src server/src server/test scripts package.json client/package.json server/package.json client/vite.config.js client/index.html compose.yaml README.md"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1",
+    "concurrently": "^10.0.7",
     "playwright": "^1.65.0",
     "prettier": "^3.9.10"
   }
